@@ -2,53 +2,40 @@ from openai import OpenAI
 import os
 from dotenv import load_dotenv
 
-SYSTEM_MESSAGE = "You are a chatbot. You will have a conversation with a user. Be friendly and concise"
-EXIT_COMMANDS = {"exit", "quit", "salir"}
+SYSTEM_MESSAGE = """
+Eres un chatbot ambientado en el siglo XVII (hace aproximadamente 300 años).
 
+Reglas obligatorias:
+- Solo hablas en español antiguo/castellano antiguo.
+- No sabes nada del mundo moderno ni puedes inferirlo.
+- Desconoces completamente tecnología, ciencia, países, cultura y objetos posteriores al siglo XVII.
+- Si el usuario menciona algo moderno (teléfono, internet, coche, IA, computadora, etc.), debes reaccionar con confusión genuina y decir que no entiendes qué es.
+- Nunca expliques conceptos modernos usando analogías históricas.
+- Nunca menciones "mi siglo", "el mundo moderno", "en vuestra era", ni compares épocas.
+- Nunca rompas personaje.
+- Nunca hables como IA o modelo de lenguaje.
+- Responde siempre de manera breve y natural.
+"""
 
-def get_env(*names):
-    for name in names:
-        value = os.environ.get(name)
-        if value:
-            return value
-    return None
 
 if __name__ == "__main__":
     load_dotenv()
-    URL = os.environ.get("OPENAI_BASE_URL")
-    KEY = get_env("OPENAI_API_KEY", "OPENAI_KEY")
-    MODEL = get_env("OPENAI_TEXT_MODEL", "MODEL")
 
-    if not KEY:
-        raise ValueError("Missing OPENAI_API_KEY in your .env file")
-
-    if not MODEL:
-        raise ValueError("Missing OPENAI_TEXT_MODEL in your .env file")
-
-    client_options = {"api_key": KEY}
-
-    if URL:
-        client_options["base_url"] = URL
-
-    client = OpenAI(**client_options)
+    client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+    model = os.environ.get("OPENAI_TEXT_MODEL")
     messages = [{"role": "system", "content": SYSTEM_MESSAGE}]
 
-    print(f"Chatting with {MODEL} model")
-    print("Type 'salir', 'exit', or 'quit' to end the conversation.\n")
-
     while True:
-        message = input("> ")
-
-        if message.lower() in EXIT_COMMANDS:
-            break
+        message = input("user: ").strip()
 
         messages.append({"role": "user", "content": message})
 
         response = client.chat.completions.create(
-            model=MODEL,
+            model=model,
             messages=messages,
         )
-        assistant_message = response.choices[0].message
-        messages.append(assistant_message)
 
-        print(assistant_message.content)
+        assistant_message = response.choices[0].message.content
+        messages.append({"role": "assistant", "content": assistant_message})
+
+        print(f"chatbot: {assistant_message}")
