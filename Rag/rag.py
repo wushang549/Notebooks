@@ -70,7 +70,37 @@ def load_documents(data_dir: str = DEFAULT_DATA_DIR) -> list[Document]:
     as `page_content` and includes metadata for the source file path and
     document type.
     """
-    pass
+    document_types = ("emails", "notes", "sms", "calendar")
+    candidate_dirs = [data_dir]
+
+    if not os.path.isabs(data_dir):
+        module_data_dir = os.path.join(os.path.dirname(__file__), data_dir)
+        if os.path.abspath(module_data_dir) != os.path.abspath(data_dir):
+            candidate_dirs.append(module_data_dir)
+
+    for base_dir in candidate_dirs:
+        docs: list[Document] = []
+
+        for document_type in document_types:
+            pattern = os.path.join(base_dir, document_type, "*.txt")
+            for file_path in sorted(globmod.glob(pattern)):
+                with open(file_path, "r", encoding="utf-8") as file:
+                    text = file.read()
+
+                docs.append(
+                    Document(
+                        page_content=text,
+                        metadata={
+                            "source": os.path.abspath(file_path),
+                            "document_type": document_type,
+                        },
+                    )
+                )
+
+        if docs:
+            return docs
+
+    return []
 
 
 def split_documents(
@@ -83,7 +113,11 @@ def split_documents(
     The resulting chunked Document objects use the configured chunk size and
     overlap while preserving the original document metadata.
     """
-    pass
+    splitter = RecursiveCharacterTextSplitter(
+        chunk_size=chunk_size,
+        chunk_overlap=chunk_overlap,
+    )
+    return splitter.split_documents(docs)
 
 
 def build_index(
@@ -95,7 +129,20 @@ def build_index(
     The index contains normalized float32 embeddings generated from each
     chunk's text with the provided embedding model.
     """
-    pass
+    if not chunks:
+        raise ValueError("Cannot build a FAISS index without document chunks")
+
+    texts = [chunk.page_content for chunk in chunks]
+    embeddings = embedding_model.encode(
+        texts,
+        convert_to_numpy=True,
+        normalize_embeddings=True,
+    )
+    embeddings = np.asarray(embeddings, dtype=np.float32)
+
+    index = faiss.IndexFlatIP(embeddings.shape[1])
+    index.add(embeddings)
+    return index
 
 
 def retrieve(
@@ -113,7 +160,19 @@ def retrieve(
     pass
 
 
-SYSTEM_PROMPT = ""
+SYSTEM_PROMPT = """You are a personal digital assistant that answers questions
+using only the provided retrieved context from the user's simulated personal
+documents and the relevant conversation history.
+
+Rules:
+- Answer in the same language as the user's question.
+- Use only facts supported by the retrieved context.
+- Do not invent names, dates, places, addresses, times, or details.
+- If the context does not contain enough relevant information, say that you
+  do not have enough information in the available documents to answer.
+- When possible, mention which document type or source supports the answer.
+- Keep answers concise and directly focused on the user's question.
+"""
 
 
 class Assistant:
