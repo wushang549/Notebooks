@@ -157,7 +157,13 @@ def retrieve(
     Results are ordered by similarity and include the chunk text, similarity
     score, and metadata for each matching chunk.
     """
-    pass
+    
+    query_embedding = model.encode([query], normalize_embeddings=True).astype(np.float32)
+    scores, indices = index.search(query_embedding, k)
+    results = []
+    for score, idx in zip(scores[0], indices[0]):
+        results.append({"text": chunks[idx].page_content, "score": float(score), "metadata": chunks[idx].metadata})
+    return results
 
 
 SYSTEM_PROMPT = """You are a personal digital assistant that answers questions
@@ -170,7 +176,11 @@ Rules:
 - Do not invent names, dates, places, addresses, times, or details.
 - If the context does not contain enough relevant information, say that you
   do not have enough information in the available documents to answer.
-- When possible, mention which document type or source supports the answer.
+- Always mention your references (the documents from which your answer was based on), 
+  except if your answer says that you don't have enough information or something similar.
+- Use this general format for your responses: First your answer to the user's prompt. 
+  Then, after a blank line, a list with the title "References", followed by the list of 
+  each document's path (including file name) used to generate your answer. 
 - Keep answers concise and directly focused on the user's question.
 """
 
@@ -200,14 +210,38 @@ class Assistant:
         self.top_k = self.config["top_k"]
         self.history: list[dict[str, str]] = []
 
-    def ask(self, question: str, k: int | None = None) -> str:
+    def ask(self, question: str, k: int = DEFAULT_TOP_K) -> str:
         """Generates an answer from the retrieved context and conversation history.
 
         The current question is combined with relevant document chunks, previous
         conversation messages, and the system prompt. The assistant response is
         appended to history alongside the user message.
         """
-        pass
+        results = retrieve(question, self.index, self.model, self.chunks, k)
+        context = "\n\n---\n\n".join(
+            [
+                f"Source: {r['metadata']['source']}\n"
+                f"Type: {r['metadata']['document_type']}\n"
+                f"Score: {r['score']:.4f}\n\n"
+                f"{r['text']}"
+                for r in results
+            ]
+        )
+        messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+        for item in self.history:
+            messages.append(item)
+        messages.append({"role": "user", "content": f"Context:\n{context}\n\nQuestion: {question}"})
+        response = self.client.chat.completions.create(
+            model=self.config["model"],
+            messages=messages
+        )
+
+        answer = response.choices[0].message.content
+
+        self.history.append({"role": "user", "content": question})
+        self.history.append({"role": "assistant", "content": answer})
+
+        return answer
 
     def clear_history(self) -> None:
         """Empties the conversation history."""
