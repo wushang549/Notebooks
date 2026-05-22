@@ -8,6 +8,7 @@ import faiss
 from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from sentence_transformers import SentenceTransformer
+from sentence_transformers import CrossEncoder
 from openai import OpenAI
 
 # Default configs
@@ -17,6 +18,7 @@ DEFAULT_LLM_MODEL = "gpt-4.1-mini"
 DEFAULT_CHUNK_SIZE = 256
 DEFAULT_CHUNK_OVERLAP = 32
 DEFAULT_TOP_K = 4
+DEFAULT_CROSS_ENCODER = "cross-encoder/ms-marco-MiniLM-L-6-v2"
 
 
 def _parse_int_setting(name: str, value: Any) -> int:
@@ -150,21 +152,40 @@ def retrieve(
         index: faiss.IndexFlatIP,
         model: SentenceTransformer,
         chunks: list[Document],
-        k: int = DEFAULT_TOP_K,
+        metadata_filter: list[str] = None,
+        k: int = DEFAULT_TOP_K
 ) -> list[dict]:
     """Gets the most relevant chunks for a query.
 
     Results are ordered by similarity and include the chunk text, similarity
     score, and metadata for each matching chunk.
     """
-    
-    query_embedding = model.encode([query], normalize_embeddings=True).astype(np.float32)
-    scores, indices = index.search(query_embedding, k)
+
     results = []
-    for score, idx in zip(scores[0], indices[0]):
-        results.append({"text": chunks[idx].page_content, "score": float(score), "metadata": chunks[idx].metadata})
+    query_embedding = model.encode([query], normalize_embeddings=True).astype(np.float32)
+    if metadata_filter:
+        scores, indices = index.search(query_embedding, k*2)
+        for score, idx in zip(scores[0], indices[0]):
+            if (chunks[idx].metadata["document_type"] in metadata_filter):
+                results.append({"text": chunks[idx].page_content, "score": float(score), "metadata": chunks[idx].metadata})
+        if (len(results) > k):
+            results = results[:k]
+    else:
+        scores, indices = index.search(query_embedding, k)
+        for score, idx in zip(scores[0], indices[0]):
+            results.append({"text": chunks[idx].page_content, "score": float(score), "metadata": chunks[idx].metadata})
+
     return results
 
+def rerank(cross_encoder: CrossEncoder, query: str, results: list[dict], top_n=3):
+    if not results:
+        return []
+    pairs = [(query, r["text"]) for r in results]
+    scores = cross_encoder.predict(pairs)
+    ranked = sorted(
+        zip(scores, results), key=lambda x: x[0], reverse=True
+    )
+    return [r for _, r in ranked[:top_n]]
 
 SYSTEM_PROMPT = """You are a personal digital assistant that answers questions
 using only the provided retrieved context from the user's simulated personal
@@ -181,6 +202,10 @@ Rules:
 - Use this general format for your responses: First your answer to the user's prompt. 
   Then, after a blank line, a list with the title "References", followed by the list of 
   each document's path (including file name) used to generate your answer. 
+- Only use information from context documents with a decent similarity score or with 
+  useful information for the user's prompt. If you do not use some of the context documents provided 
+  due to low similarity score or because their content is not relevant for the question, 
+  don't mention them in the references list.
 - Keep answers concise and directly focused on the user's question.
 """
 
@@ -197,12 +222,14 @@ class Assistant:
             self,
             index: faiss.IndexFlatIP,
             model: SentenceTransformer,
+            cross_encoder: CrossEncoder,
             chunks: list[Document],
             client: OpenAI,
-            config: dict[str, Any] | None = None,
+            config: dict[str, Any] | None = None
     ) -> None:
         self.index = index
         self.model = model
+        self.cross_encoder = cross_encoder
         self.chunks = chunks
         self.client = client
         self.config = resolve_config(config)
@@ -217,16 +244,42 @@ class Assistant:
         conversation messages, and the system prompt. The assistant response is
         appended to history alongside the user message.
         """
-        results = retrieve(question, self.index, self.model, self.chunks, k)
-        context = "\n\n---\n\n".join(
-            [
-                f"Source: {r['metadata']['source']}\n"
-                f"Type: {r['metadata']['document_type']}\n"
-                f"Score: {r['score']:.4f}\n\n"
-                f"{r['text']}"
-                for r in results
-            ]
+        metadata_filter = []
+
+        if "/notes" in question:
+            metadata_filter.append("notes")
+        if "/sms" in question:
+            metadata_filter.append("sms")
+        if "/calendar" in question: 
+            metadata_filter.append("calendar")
+        if "/email" in question: 
+            metadata_filter.append("emails")
+
+        question = (
+            question
+            .replace("/notes", "notes")
+            .replace("/sms", "sms")
+            .replace("/calendar", "calendar")
+            .replace("/email", "email")
+            .strip()
         )
+
+        results = retrieve(question, self.index, self.model, self.chunks, metadata_filter, k+5)
+        results = rerank(self.cross_encoder, question, results, k)
+
+        if not results:
+            context = "No relevant documents found."
+        else: 
+            context = "\n\n---\n\n".join(
+                [
+                    f"Source: {r['metadata']['source']}\n"
+                    f"Type: {r['metadata']['document_type']}\n"
+                    f"Score: {r['score']:.4f}\n\n"
+                    f"{r['text']}"
+                    for r in results
+                ]
+            )
+            
         messages = [{"role": "system", "content": SYSTEM_PROMPT}]
         for item in self.history:
             messages.append(item)
@@ -270,6 +323,10 @@ class Assistant:
         print(f"  Created {len(chunks)} chunks")
 
         embedding_model = SentenceTransformer(resolved_config["embedding_model"])
+        if "cross_encoder" in resolved_config:
+            cross_encoder = CrossEncoder(resolved_config["cross_encoder"])
+        else: 
+            cross_encoder = CrossEncoder(DEFAULT_CROSS_ENCODER)
 
         print("Building FAISS index...")
         index = build_index(chunks, embedding_model)
@@ -283,4 +340,4 @@ class Assistant:
         client = OpenAI(**client_kwargs)
 
         print("Ready!\n")
-        return cls(index, embedding_model, chunks, client, resolved_config)
+        return cls(index, embedding_model, cross_encoder, chunks, client, resolved_config)
