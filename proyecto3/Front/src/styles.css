@@ -557,7 +557,7 @@ select {
 
 .analysis-list {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
   gap: 14px;
   margin: 0;
 }
@@ -583,6 +583,8 @@ dt {
   font-size: 0.76rem;
   font-weight: 850;
   letter-spacing: 0;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
   text-transform: uppercase;
 }
 
@@ -590,6 +592,7 @@ dd {
   margin: 7px 0 0;
   color: #1f2937;
   line-height: 1.5;
+  overflow-wrap: anywhere;
 }
 
 .metric-box dd {
