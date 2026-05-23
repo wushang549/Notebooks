@@ -1,29 +1,7 @@
-import { useRef, useState } from "react";
+import { useState } from "react";
 import Header from "./components/Header.jsx";
 import MessageForm from "./components/MessageForm.jsx";
 import ResultsPanel from "./components/ResultsPanel.jsx";
-
-const mockResult = {
-  improvedMessage: `Hola, espero que te encuentres muy bien.
-
-Queria dar seguimiento a la posicion a la que postule. Agradeceria cualquier actualizacion que pudieras compartir sobre el estado del proceso.
-
-Gracias por tu tiempo.`,
-  analysis: {
-    detectedTone: "Impaciente / informal",
-    clarity: "Media",
-    professionalism: "Baja-media",
-    toneRisk: "Medio",
-    summary:
-      "El mensaje original comunica la idea, pero algunas frases pueden sonar impacientes o demasiado casuales para un contexto profesional.",
-  },
-  changes: [
-    "Se reemplazo el lenguaje casual por un saludo mas profesional.",
-    "Se eliminaron frases que podian sonar impacientes.",
-    "La solicitud se hizo mas clara y respetuosa.",
-    "Se ajusto el mensaje para un contexto con reclutador.",
-  ],
-};
 
 const initialOptions = {
   tone: "Profesional",
@@ -33,7 +11,6 @@ const initialOptions = {
 };
 
 function App() {
-  const generationTimeoutRef = useRef(null);
   const [message, setMessage] = useState("");
   const [options, setOptions] = useState(initialOptions);
   const [result, setResult] = useState(null);
@@ -48,7 +25,7 @@ function App() {
     }));
   };
 
-  const handleGenerate = () => {
+  const handleGenerate = async () => {
     if (!message.trim()) {
       setError("Por favor ingresa un mensaje primero.");
       setResult(null);
@@ -57,25 +34,40 @@ function App() {
 
     setError("");
     setIsLoading(true);
-    setGeneratedOptions(options);
 
-    if (generationTimeoutRef.current) {
-      window.clearTimeout(generationTimeoutRef.current);
-    }
+    try {
+      const response = await fetch("/api/rewrite", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          message: message.trim(),
+          options,
+        }),
+      });
 
-    generationTimeoutRef.current = window.setTimeout(() => {
-      setResult(mockResult);
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "No se pudo generar el mensaje.");
+      }
+
+      setResult(data);
+      setGeneratedOptions(options);
+    } catch (requestError) {
+      setResult(null);
+      setGeneratedOptions(null);
+      setError(
+        requestError.message ||
+          "Ocurrio un error al conectar con el generador."
+      );
+    } finally {
       setIsLoading(false);
-      generationTimeoutRef.current = null;
-    }, 1000);
+    }
   };
 
   const handleClear = () => {
-    if (generationTimeoutRef.current) {
-      window.clearTimeout(generationTimeoutRef.current);
-      generationTimeoutRef.current = null;
-    }
-
     setMessage("");
     setError("");
     setResult(null);

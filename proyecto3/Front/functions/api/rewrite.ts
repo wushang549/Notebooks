@@ -1,0 +1,222 @@
+type Env = {
+  OPENAI_API_KEY?: string;
+  OPENAI_MODEL?: string;
+};
+
+type PagesContext = {
+  request: Request;
+  env: Env;
+};
+
+type RewriteOptions = {
+  tone?: string;
+  intent?: string;
+  language?: string;
+  length?: string;
+};
+
+type RewritePayload = {
+  message?: unknown;
+  options?: RewriteOptions;
+};
+
+type OpenAIContent = {
+  type?: string;
+  text?: string;
+};
+
+type OpenAIOutputItem = {
+  content?: OpenAIContent[];
+};
+
+type OpenAIResponseData = {
+  output_text?: string;
+  output?: OpenAIOutputItem[];
+  error?: {
+    message?: string;
+  };
+};
+
+const RESPONSE_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["improvedMessage", "analysis", "changes"],
+  properties: {
+    improvedMessage: {
+      type: "string",
+      description: "The rewritten professional message.",
+    },
+    analysis: {
+      type: "object",
+      additionalProperties: false,
+      required: [
+        "detectedTone",
+        "clarity",
+        "professionalism",
+        "toneRisk",
+        "summary",
+      ],
+      properties: {
+        detectedTone: { type: "string" },
+        clarity: { type: "string" },
+        professionalism: { type: "string" },
+        toneRisk: { type: "string" },
+        summary: { type: "string" },
+      },
+    },
+    changes: {
+      type: "array",
+      minItems: 3,
+      maxItems: 6,
+      items: { type: "string" },
+    },
+  },
+} as const;
+
+const MAX_MESSAGE_LENGTH = 6000;
+
+function jsonResponse(body: unknown, status = 200): Response {
+  return Response.json(body, {
+    status,
+    headers: {
+      "Cache-Control": "no-store",
+    },
+  });
+}
+
+function getOutputText(responseData: OpenAIResponseData): string {
+  if (typeof responseData.output_text === "string") {
+    return responseData.output_text;
+  }
+
+  for (const item of responseData.output ?? []) {
+    for (const content of item.content ?? []) {
+      if (content.type === "output_text" && typeof content.text === "string") {
+        return content.text;
+      }
+    }
+  }
+
+  return "";
+}
+
+function buildPrompt({
+  message,
+  options,
+}: {
+  message: string;
+  options: RewriteOptions;
+}): string {
+  return `
+Rewrite the user's rough message according to the selected preferences.
+
+Original message:
+${message}
+
+Selected preferences:
+- Tone: ${options.tone || "Profesional"}
+- Intent: ${options.intent || "Dar seguimiento"}
+- Output language: ${options.language || "Mismo"}
+- Length: ${options.length || "Normal"}
+
+Rules:
+- Preserve the user's core meaning.
+- Make the rewritten message clear, professional, and natural.
+- Adapt the message to the selected tone and intent.
+- If output language is "Mismo", use the same language as the original message.
+- If output language names a language, write the improved message in that language.
+- Do not invent facts, dates, names, application status, or commitments.
+- Keep the analysis concise and useful for a professional writing assistant.
+- Write analysis and changes in Spanish for this app UI.
+`.trim();
+}
+
+export async function onRequestPost({
+  request,
+  env,
+}: PagesContext): Promise<Response> {
+  const apiKey = env.OPENAI_API_KEY;
+
+  if (!apiKey) {
+    return jsonResponse(
+      { error: "OPENAI_API_KEY no esta configurada en el entorno." },
+      500
+    );
+  }
+
+  let payload: RewritePayload;
+
+  try {
+    payload = (await request.json()) as RewritePayload;
+  } catch {
+    return jsonResponse(
+      { error: "El cuerpo de la solicitud no es JSON valido." },
+      400
+    );
+  }
+
+  const message =
+    typeof payload.message === "string" ? payload.message.trim() : "";
+  const options = payload.options ?? {};
+
+  if (!message) {
+    return jsonResponse({ error: "El mensaje original es obligatorio." }, 400);
+  }
+
+  if (message.length > MAX_MESSAGE_LENGTH) {
+    return jsonResponse(
+      { error: `El mensaje no puede superar ${MAX_MESSAGE_LENGTH} caracteres.` },
+      400
+    );
+  }
+
+  const model = env.OPENAI_MODEL || "gpt-5.4";
+
+  const openAiResponse = await fetch("https://api.openai.com/v1/responses", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model,
+      instructions:
+        "You are Draftly, an AI writing assistant for professional communication. Return only valid JSON matching the requested schema.",
+      input: buildPrompt({ message, options }),
+      text: {
+        format: {
+          type: "json_schema",
+          name: "draftly_rewrite_result",
+          strict: true,
+          schema: RESPONSE_SCHEMA,
+        },
+      },
+    }),
+  });
+
+  const data = (await openAiResponse.json()) as OpenAIResponseData;
+
+  if (!openAiResponse.ok) {
+    return jsonResponse(
+      {
+        error:
+          data.error?.message ||
+          "OpenAI no pudo generar una respuesta en este momento.",
+      },
+      openAiResponse.status
+    );
+  }
+
+  try {
+    return jsonResponse(JSON.parse(getOutputText(data)));
+  } catch {
+    return jsonResponse(
+      { error: "La respuesta generada no tuvo el formato esperado." },
+      502
+    );
+  }
+}
+
+export function onRequestGet(): Response {
+  return jsonResponse({ status: "ok" });
+}
