@@ -1,42 +1,43 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import Header from "./components/Header.jsx";
 import MessageForm from "./components/MessageForm.jsx";
 import ResultsPanel from "./components/ResultsPanel.jsx";
 
 const mockResult = {
-  improvedMessage: `Hi, I hope you're doing well.
+  improvedMessage: `Hola, espero que te encuentres muy bien.
 
-I wanted to follow up regarding the position I applied for. I would appreciate any update you could share about the status of the process.
+Queria dar seguimiento a la posicion a la que postule. Agradeceria cualquier actualizacion que pudieras compartir sobre el estado del proceso.
 
-Thank you for your time.`,
+Gracias por tu tiempo.`,
   analysis: {
-    detectedTone: "Impatient / informal",
-    clarity: "Medium",
-    professionalism: "Low-medium",
+    detectedTone: "Impaciente / informal",
+    clarity: "Media",
+    professionalism: "Baja-media",
+    toneRisk: "Medio",
     summary:
-      "The original message communicates the idea, but some phrases may sound impatient or too casual for a professional context.",
+      "El mensaje original comunica la idea, pero algunas frases pueden sonar impacientes o demasiado casuales para un contexto profesional.",
   },
   changes: [
-    "Replaced casual wording with a more professional greeting.",
-    "Removed phrases that could sound impatient.",
-    "Made the request clearer and more respectful.",
-    "Adjusted the message for a recruiter context.",
+    "Se reemplazo el lenguaje casual por un saludo mas profesional.",
+    "Se eliminaron frases que podian sonar impacientes.",
+    "La solicitud se hizo mas clara y respetuosa.",
+    "Se ajusto el mensaje para un contexto con reclutador.",
   ],
 };
 
 const initialOptions = {
-  tone: "Professional",
-  intent: "Follow up",
-  language: "English",
+  tone: "Profesional",
+  intent: "Dar seguimiento",
+  language: "Mismo",
   length: "Normal",
-  formality: "Medium",
-  recipient: "Recruiter",
 };
 
 function App() {
+  const generationTimeoutRef = useRef(null);
   const [message, setMessage] = useState("");
   const [options, setOptions] = useState(initialOptions);
   const [result, setResult] = useState(null);
+  const [generatedOptions, setGeneratedOptions] = useState(null);
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
@@ -49,29 +50,50 @@ function App() {
 
   const handleGenerate = () => {
     if (!message.trim()) {
-      setError("Please enter a message first.");
+      setError("Por favor ingresa un mensaje primero.");
       setResult(null);
       return;
     }
 
     setError("");
     setIsLoading(true);
+    setGeneratedOptions(options);
 
-    window.setTimeout(() => {
+    if (generationTimeoutRef.current) {
+      window.clearTimeout(generationTimeoutRef.current);
+    }
+
+    generationTimeoutRef.current = window.setTimeout(() => {
       setResult(mockResult);
       setIsLoading(false);
+      generationTimeoutRef.current = null;
     }, 1000);
+  };
+
+  const handleClear = () => {
+    if (generationTimeoutRef.current) {
+      window.clearTimeout(generationTimeoutRef.current);
+      generationTimeoutRef.current = null;
+    }
+
+    setMessage("");
+    setError("");
+    setResult(null);
+    setGeneratedOptions(null);
+    setIsLoading(false);
   };
 
   return (
     <div className="app-shell">
-      <Header />
 
-      <main className="dashboard" aria-label="ToneCraft AI workspace">
+      <main className="dashboard" aria-label="Area de trabajo de Draftly">
         <section className="panel form-panel" aria-labelledby="composer-title">
           <div className="section-heading">
-            <p className="eyebrow">Composer</p>
-            <h2 id="composer-title">Craft the right message</h2>
+            <p className="eyebrow">Redactor</p>
+            <h2 id="composer-title">Crea el mensaje adecuado</h2>
+            <p>
+              Pega un borrador y personaliza como debe sonar el mensaje final.
+            </p>
           </div>
 
           <MessageForm
@@ -85,10 +107,15 @@ function App() {
             }}
             onOptionChange={handleOptionChange}
             onGenerate={handleGenerate}
+            onClear={handleClear}
           />
         </section>
 
-        <ResultsPanel result={result} isLoading={isLoading} />
+        <ResultsPanel
+          result={result}
+          isLoading={isLoading}
+          generatedOptions={generatedOptions}
+        />
       </main>
     </div>
   );

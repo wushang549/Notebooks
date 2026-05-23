@@ -1,14 +1,14 @@
 import { useEffect, useState } from "react";
 import ResultCard from "./ResultCard.jsx";
 
-function ResultsPanel({ result, isLoading }) {
-  const [copyLabel, setCopyLabel] = useState("Copy message");
+function ResultsPanel({ result, isLoading, generatedOptions }) {
+  const [copyLabel, setCopyLabel] = useState("Copiar mensaje");
 
   useEffect(() => {
-    if (copyLabel !== "Copied!") return undefined;
+    if (copyLabel !== "Copiado!") return undefined;
 
     const timeoutId = window.setTimeout(() => {
-      setCopyLabel("Copy message");
+      setCopyLabel("Copiar mensaje");
     }, 1400);
 
     return () => window.clearTimeout(timeoutId);
@@ -18,22 +18,31 @@ function ResultsPanel({ result, isLoading }) {
     if (!result?.improvedMessage) return;
 
     await navigator.clipboard.writeText(result.improvedMessage);
-    setCopyLabel("Copied!");
+    setCopyLabel("Copiado!");
   };
+
+  const generatedFor = generatedOptions
+    ? [
+        generatedOptions.tone,
+        generatedOptions.intent,
+        generatedOptions.language,
+      ].join(" - ")
+    : "";
 
   return (
     <section className="panel results-panel" aria-labelledby="results-title">
       <div className="section-heading">
-        <p className="eyebrow">Results</p>
-        <h2 id="results-title">Generated rewrite</h2>
+        <p className="eyebrow">Resultados</p>
+        <h2 id="results-title">Reescritura generada</h2>
       </div>
 
       {!result && !isLoading ? (
         <div className="empty-state">
-          <h3>Your improved message will appear here</h3>
+          <img className="empty-logo" src="/logo.svg" alt="" aria-hidden="true" />
+          <h3>Tu mensaje mejorado aparecera aqui</h3>
           <p>
-            Enter a message, choose your preferences, and generate a polished
-            version.
+            Ingresa un borrador, elige tus preferencias y genera una version
+            pulida.
           </p>
         </div>
       ) : null}
@@ -41,42 +50,52 @@ function ResultsPanel({ result, isLoading }) {
       {isLoading ? (
         <div className="empty-state loading-state" aria-live="polite">
           <div className="loading-dot" />
-          <h3>Generating your improved message</h3>
-          <p>Applying your tone, intent, and audience preferences.</p>
+          <h3>Generando tu mensaje mejorado</h3>
+          <p>Aplicando tus preferencias de tono, intencion y audiencia.</p>
         </div>
       ) : null}
 
       {result && !isLoading ? (
         <div className="results-stack">
-          <ResultCard title="Improved Message" className="message-card">
+          <p className="generated-for">Generado para: {generatedFor}</p>
+
+          <ResultCard title="Mensaje mejorado" className="message-card">
             <p className="improved-message">{result.improvedMessage}</p>
-            <button className="secondary-button" type="button" onClick={handleCopy}>
+            <button
+              className="secondary-button"
+              type="button"
+              onClick={handleCopy}
+            >
               {copyLabel}
             </button>
           </ResultCard>
 
-          <ResultCard title="Original Message Analysis">
+          <ResultCard title="Analisis del mensaje original">
             <dl className="analysis-list">
-              <div>
-                <dt>Detected tone</dt>
+              <div className="metric-box">
+                <dt>Tono detectado</dt>
                 <dd>{result.analysis.detectedTone}</dd>
               </div>
-              <div>
-                <dt>Clarity</dt>
+              <div className="metric-box">
+                <dt>Claridad</dt>
                 <dd>{result.analysis.clarity}</dd>
               </div>
-              <div>
-                <dt>Professionalism</dt>
+              <div className="metric-box">
+                <dt>Profesionalismo</dt>
                 <dd>{result.analysis.professionalism}</dd>
               </div>
+              <div className="metric-box">
+                <dt>Riesgo de tono</dt>
+                <dd>{result.analysis.toneRisk}</dd>
+              </div>
               <div className="summary-row">
-                <dt>Summary</dt>
+                <dt>Resumen</dt>
                 <dd>{result.analysis.summary}</dd>
               </div>
             </dl>
           </ResultCard>
 
-          <ResultCard title="Changes Made">
+          <ResultCard title="Cambios realizados">
             <ul className="changes-list">
               {result.changes.map((change) => (
                 <li key={change}>{change}</li>
