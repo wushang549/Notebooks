@@ -185,7 +185,7 @@ export async function onRequestPost({
     );
   }
 
-  const model = env.OPENAI_MODEL || "gpt-5.4";
+  const model = env.OPENAI_MODEL || "gpt-5-nano";
 
   const openAiResponse = await fetch("https://api.openai.com/v1/responses", {
     method: "POST",
