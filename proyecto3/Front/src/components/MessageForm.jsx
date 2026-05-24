@@ -72,10 +72,12 @@ const selectGroups = [
 
 function MessageForm({
   message,
+  senderName,
   options,
   error,
   isLoading,
   onMessageChange,
+  onSenderNameChange,
   onOptionChange,
   onGenerate,
   onClear,
@@ -105,6 +107,17 @@ function MessageForm({
       <div className="textarea-footer">
         <span>{message.length} caracteres</span>
       </div>
+
+      <label className="field-group" htmlFor="sender-name">
+        <span>Tu nombre (opcional)</span>
+        <input
+          id="sender-name"
+          type="text"
+          value={senderName}
+          placeholder="Ej. Diego"
+          onChange={(event) => onSenderNameChange(event.target.value)}
+        />
+      </label>
 
       {error ? (
         <p className="form-error" id="message-error" role="alert">

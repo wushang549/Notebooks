@@ -24,6 +24,7 @@ body {
 
 button,
 select,
+input,
 textarea {
   font: inherit;
 }
@@ -173,6 +174,7 @@ button:disabled {
 }
 
 textarea,
+input,
 select {
   width: 100%;
   border: 1px solid #d6deeb;
@@ -187,6 +189,7 @@ select {
 }
 
 textarea:focus,
+input:focus,
 select:focus {
   border-color: #3157d6;
   box-shadow: 0 0 0 4px rgba(49, 87, 214, 0.13);
@@ -200,6 +203,15 @@ textarea {
 }
 
 textarea::placeholder {
+  color: #9aa7b8;
+}
+
+input {
+  min-height: 48px;
+  padding: 0 14px;
+}
+
+input::placeholder {
   color: #9aa7b8;
 }
 

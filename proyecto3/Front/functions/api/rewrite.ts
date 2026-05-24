@@ -17,6 +17,7 @@ type RewriteOptions = {
 
 type RewritePayload = {
   message?: unknown;
+  senderName?: unknown;
   options?: RewriteOptions;
 };
 
@@ -102,9 +103,11 @@ function getOutputText(responseData: OpenAIResponseData): string {
 
 function buildPrompt({
   message,
+  senderName,
   options,
 }: {
   message: string;
+  senderName: string;
   options: RewriteOptions;
 }): string {
   return `
@@ -112,6 +115,9 @@ Rewrite the user's rough message according to the selected preferences.
 
 Original message:
 ${message}
+
+Sender name:
+${senderName || "Not provided"}
 
 Selected preferences:
 - Tone: ${options.tone || "Profesional"}
@@ -123,6 +129,13 @@ Rules:
 - Preserve the user's core meaning.
 - Make the rewritten message clear, professional, and natural.
 - Adapt the message to the selected tone and intent.
+- Format improvedMessage like a complete professional email/message:
+  1. Greeting
+  2. Main message body
+  3. Courteous closing
+  4. Signature only if sender name is provided
+- If sender name is provided, end with an appropriate sign-off and that name.
+- If sender name is not provided, include a courteous closing but do not invent a name.
 - If output language is "Mismo", use the same language as the original message.
 - If output language names a language, write the improved message in that language.
 - Do not invent facts, dates, names, application status, or commitments.
@@ -157,6 +170,8 @@ export async function onRequestPost({
 
   const message =
     typeof payload.message === "string" ? payload.message.trim() : "";
+  const senderName =
+    typeof payload.senderName === "string" ? payload.senderName.trim() : "";
   const options = payload.options ?? {};
 
   if (!message) {
@@ -182,7 +197,7 @@ export async function onRequestPost({
       model,
       instructions:
         "You are Draftly, an AI writing assistant for professional communication. Return only valid JSON matching the requested schema.",
-      input: buildPrompt({ message, options }),
+      input: buildPrompt({ message, senderName, options }),
       text: {
         format: {
           type: "json_schema",

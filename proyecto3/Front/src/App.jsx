@@ -12,6 +12,7 @@ const initialOptions = {
 
 function App() {
   const [message, setMessage] = useState("");
+  const [senderName, setSenderName] = useState("");
   const [options, setOptions] = useState(initialOptions);
   const [result, setResult] = useState(null);
   const [generatedOptions, setGeneratedOptions] = useState(null);
@@ -43,6 +44,7 @@ function App() {
         },
         body: JSON.stringify({
           message: message.trim(),
+          senderName: senderName.trim(),
           options,
         }),
       });
@@ -69,6 +71,7 @@ function App() {
 
   const handleClear = () => {
     setMessage("");
+    setSenderName("");
     setError("");
     setResult(null);
     setGeneratedOptions(null);
@@ -97,6 +100,8 @@ function App() {
               setMessage(value);
               if (error) setError("");
             }}
+            senderName={senderName}
+            onSenderNameChange={setSenderName}
             onOptionChange={handleOptionChange}
             onGenerate={handleGenerate}
             onClear={handleClear}
