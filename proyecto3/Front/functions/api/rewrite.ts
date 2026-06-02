@@ -61,7 +61,7 @@ const RESPONSE_SCHEMA = {
         detectedTone: {
           type: "string",
           description:
-            "Describe only the tone present in the original rough message. Do not describe the rewritten message.",
+            "Describe only the tone and writing register present in the original rough message. Distinguish politeness from formality: a polite message can still be informal. Do not describe the rewritten message.",
         },
         clarity: {
           type: "string",
@@ -71,7 +71,7 @@ const RESPONSE_SCHEMA = {
         professionalism: {
           type: "string",
           description:
-            "Assess only the professionalism of the original rough message as written. Do not explain how it was improved.",
+            "Assess only the current professionalism of the original rough message as written. Do not recommend, request, or explain improvements.",
         },
         toneRisk: {
           type: "string",
@@ -166,6 +166,10 @@ Rules:
   the original message unless it already contains them.
 - In analysis, describe the original message as written. Never mention corrections,
   improvements, transformations, or the resulting rewritten message.
+- Distinguish politeness from formality. Do not label the original message as
+  formal or professional only because its intent is courteous.
+- Do not include recommendations or say that the original message needs a new
+  version inside analysis. Put all improvements exclusively in changes.
 - Keep the analysis concise and useful for a professional writing assistant.
 - Describe changes as transformations made from the original message to the
   rewritten message.
