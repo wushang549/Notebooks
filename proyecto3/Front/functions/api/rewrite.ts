@@ -58,11 +58,29 @@ const RESPONSE_SCHEMA = {
         "summary",
       ],
       properties: {
-        detectedTone: { type: "string" },
-        clarity: { type: "string" },
-        professionalism: { type: "string" },
-        toneRisk: { type: "string" },
-        summary: { type: "string" },
+        detectedTone: {
+          type: "string",
+          description: "Tone detected in the original rough message.",
+        },
+        clarity: {
+          type: "string",
+          description:
+            "Honest assessment of clarity in the original rough message, including writing issues when present.",
+        },
+        professionalism: {
+          type: "string",
+          description:
+            "Honest assessment of professionalism in the original rough message before rewriting.",
+        },
+        toneRisk: {
+          type: "string",
+          description: "Tone risk found in the original rough message.",
+        },
+        summary: {
+          type: "string",
+          description:
+            "Concise summary of the original rough message and its main writing issues.",
+        },
       },
     },
     changes: {
@@ -139,7 +157,14 @@ Rules:
 - If output language is "Mismo", use the same language as the original message.
 - If output language names a language, write the improved message in that language.
 - Do not invent facts, dates, names, application status, or commitments.
+- Analyze only the original rough message, never the rewritten improvedMessage.
+- Be honest about spelling, grammar, clarity, incomplete ideas, and informal wording
+  in the original message when those issues are present.
+- Do not attribute a greeting, closing, formal structure, or improved wording to
+  the original message unless it already contains them.
 - Keep the analysis concise and useful for a professional writing assistant.
+- Describe changes as transformations made from the original message to the
+  rewritten message.
 - Write analysis and changes in Spanish for this app UI.
 `.trim();
 }
