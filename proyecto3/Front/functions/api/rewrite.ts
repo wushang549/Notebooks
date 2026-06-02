@@ -60,26 +60,28 @@ const RESPONSE_SCHEMA = {
       properties: {
         detectedTone: {
           type: "string",
-          description: "Tone detected in the original rough message.",
+          description:
+            "Describe only the tone present in the original rough message. Do not describe the rewritten message.",
         },
         clarity: {
           type: "string",
           description:
-            "Honest assessment of clarity in the original rough message, including writing issues when present.",
+            "Assess only the clarity of the original rough message as written. Mention its writing issues, but do not mention corrections or improvements.",
         },
         professionalism: {
           type: "string",
           description:
-            "Honest assessment of professionalism in the original rough message before rewriting.",
+            "Assess only the professionalism of the original rough message as written. Do not explain how it was improved.",
         },
         toneRisk: {
           type: "string",
-          description: "Tone risk found in the original rough message.",
+          description:
+            "Describe only the tone risk present in the original rough message. Do not describe risk after rewriting.",
         },
         summary: {
           type: "string",
           description:
-            "Concise summary of the original rough message and its main writing issues.",
+            "Summarize only the original rough message and its main writing issues. Do not mention the rewrite or transformations.",
         },
       },
     },
@@ -162,6 +164,8 @@ Rules:
   in the original message when those issues are present.
 - Do not attribute a greeting, closing, formal structure, or improved wording to
   the original message unless it already contains them.
+- In analysis, describe the original message as written. Never mention corrections,
+  improvements, transformations, or the resulting rewritten message.
 - Keep the analysis concise and useful for a professional writing assistant.
 - Describe changes as transformations made from the original message to the
   rewritten message.
@@ -224,7 +228,7 @@ export async function onRequestPost({
         effort: "minimal",
       },
       instructions:
-        "You are Draftly, an AI writing assistant for professional communication. Return only valid JSON matching the requested schema.",
+        "You are Draftly, an AI writing assistant for professional communication. Return only valid JSON matching the requested schema. In analysis, evaluate only the original rough message as written. Mention rewrite improvements only in changes.",
       input: buildPrompt({ message, senderName, options }),
       text: {
         format: {
