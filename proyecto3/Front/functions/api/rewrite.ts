@@ -195,6 +195,9 @@ export async function onRequestPost({
     },
     body: JSON.stringify({
       model,
+      reasoning: {
+        effort: "minimal",
+      },
       instructions:
         "You are Draftly, an AI writing assistant for professional communication. Return only valid JSON matching the requested schema.",
       input: buildPrompt({ message, senderName, options }),
